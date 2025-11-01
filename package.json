@@ -1,0 +1,26 @@
+{
+  "name": "craftmine-multiplayer",
+  "version": "1.0.0",
+  "description": "Multiplayer voxel game - play at school!",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "voxel",
+    "minecraft",
+    "threejs"
+  ],
+  "author": "",
+  "license": "MIT"
+}

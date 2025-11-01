@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Craft&Mine (single-file)</title>
+    <style>
+/* Inlined Style.css */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; font-family: 'Minecraft', Arial, sans-serif; background: #000; }
+canvas { position: fixed; top: 0; left: 0; outline: none; }
+#main-menu, #multiplayer-menu, #host-menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+
+/* Loading screen */
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    color: #ffffff;
+    font-family: 'Minecraft', Arial, sans-serif;
+}
+
+#loading-screen h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px #3f3f3f;
+}
+
+#loading-bar-container {
+    width: 300px;
+    height: 20px;
+    background: #000000;
+    border: 2px solid #ffffff;
+}
+
+#loading-bar {
+    width: 0%;
+    height: 100%;
+    background: #66cc00;
+    transition: width 0.2s ease-in-out;
+}
+
+#loading-text {
+    margin-top: 10px;
+    font-size: 16px;
+    opacity: 0.8;
+}
+.menu-section { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; max-width: 400px; }
+#main-menu h1 { color: #fff; font-size: 48px; text-shadow: 2px 2px #3f3f3f; margin-bottom: 40px; transform: rotateX(20deg); }
+.menu-button { width: 300px; height: 40px; margin: 8px 0; background: #999999; border: 2px solid #000; color: #fff; font-size: 20px; text-align: center; line-height: 36px; cursor: pointer; position: relative; overflow: hidden; text-shadow: 2px 2px #3f3f3f; }
+.menu-button:hover { background: #aaaaaa; }
+.menu-button:active { background: #888888; }
+#server-list { width: 100%; max-height: 300px; overflow-y: auto; margin: 10px 0; background: rgba(0, 0, 0, 0.3); border: 2px solid #000; padding: 10px; }
+.server-item { background: #999999; border: 2px solid #000; color: #fff; padding: 8px; margin: 4px 0; cursor: pointer; text-shadow: 1px 1px #3f3f3f; }
+.server-item:hover { background: #aaaaaa; }
+.server-item.disabled { background: #555555; cursor: default; color: #cccccc; }
+input[type="text"] { width: 100%; padding: 8px; margin: 8px 0; background: #999999; border: 2px solid #000; color: #fff; font-size: 16px; text-align: center; font-family: 'Minecraft', Arial, sans-serif; }
+input[type="text"]::placeholder { color: #ddd; }
+.menu-button.disabled { background: #555555; cursor: not-allowed; color: #888888; }
+#overlay { position: fixed; top: 20px; left: 20px; background: rgba(0, 0, 0, 0.7); color: white; padding: 15px; border-radius: 8px; z-index: 100; pointer-events: none; display: none; }
+#overlay h2 { margin-bottom: 10px; font-size: 18px; }
+#mobile-prompt { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+#mobile-prompt .modal { background: #111; padding: 20px 30px; border: 2px solid #000; text-align: center; }
+#mobile-prompt .modal h2 { color: #fff; margin-bottom: 12px; }
+.modal-buttons { display:flex; gap:10px; flex-direction:column; }
+#mobile-controls { position: fixed; bottom: 16px; left: 16px; right: 16px; pointer-events: none; z-index:1500; }
+#joystick { position: absolute; bottom: 10px; left: 10px; width: 140px; height: 140px; background: rgba(255,255,255,0.08); border-radius: 50%; pointer-events: auto; }
+#jump-button { position: fixed; right: 16px; bottom: 22px; width: 80px; height: 48px; pointer-events: auto; }
+.menu-button { user-select: none; -webkit-user-select: none; }
+    </style>
+</head>
+<body>
+    <div id="main-menu">
+        <h1>Craft&Mine</h1>
+        <div class="menu-button" id="singleplayer">Singleplayer</div>
+        <div class="menu-button" id="multiplayer">Multiplayer</div>
+        <div class="menu-button" id="quit">Quit Game</div>
+    </div>
+
+    <div id="multiplayer-menu" style="display: none;">
+        <h2>Multiplayer</h2>
+        <div class="menu-section">
+            <div class="menu-button" id="host-game">Host Game</div>
+            <div class="menu-button" id="join-game">Join Game</div>
+            <div id="server-list"></div>
+            <div class="menu-button" id="back-to-main">Back</div>
+        </div>
+    </div>
+
+    <div id="host-menu" style="display: none;">
+        <h2>Host Game</h2>
+        <div class="menu-section">
+            <input type="text" id="game-name" placeholder="Enter Game Name">
+            <div class="menu-button" id="start-server">Create Game</div>
+            <div class="menu-button" id="back-to-multiplayer">Back</div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h2>Controls:</h2>
+        <p>WASD - Move<br>
+        Space - Jump<br>
+        Mouse - Look around<br>
+        F5 - Toggle Camera View<br>
+        Esc - Pause Game</p>
+    </div>
+
+    <!-- Loading screen -->
+    <div id="loading-screen">
+        <h2>Loading Terrain...</h2>
+        <div id="loading-bar-container">
+            <div id="loading-bar"></div>
+        </div>
+        <div id="loading-text">Generating world...</div>
+    </div>
+
+    <!-- Mobile prompt modal -->
+    <div id="mobile-prompt" style="display: none;">
+        <div class="modal">
+            <h2>Are you on mobile?</h2>
+            <div class="modal-buttons">
+                <div class="menu-button" id="mobile-yes">Yes</div>
+                <div class="menu-button" id="mobile-no">No, it's just a computer</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile controls (hidden by default) -->
+    <div id="mobile-controls" style="display:none;">
+        <div id="joystick" class="joystick"></div>
+        <div id="jump-button" class="menu-button">Jump</div>
+    </div>
+
+    <!-- PeerJS and Three.js (CDN) -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.154.0/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.154.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Inlined Perlin noise + Main.js -->
+    <script>
+    // Simple Perlin Noise implementation (inlined)
+    class Noise {
+        constructor(seed = Math.random()) {
+            this.grad3 = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+            this.p = new Array(256);
+            this.perm = new Array(512);
+            this.seed(seed);
+        }
+
+        seed(seed) {
+            if(seed > 0 && seed < 1) seed *= 65536;
+            seed = Math.floor(seed);
+            if(seed < 256) seed |= seed << 8;
+            for(let i = 0; i < 256; i++) {
+                let v;
+                if (i & 1) v = this.p[i] ^ (seed & 255);
+                else v = this.p[i] ^ ((seed>>8) & 255);
+                this.p[i] = v;
+                this.perm[i] = this.perm[i + 256] = v;
+            }
+        }
+
+        perlin2(x, y) {
+            const X = Math.floor(x) & 255;
+            const Y = Math.floor(y) & 255;
+            x -= Math.floor(x);
+            y -= Math.floor(y);
+            const u = this.fade(x);
+            const v = this.fade(y);
+            const A = this.p[X  ]+Y;
+            const B = this.p[X+1]+Y;
+            return this.lerp(v, 
+                this.lerp(u,
+                    this.grad2(this.p[A  ], x  , y  ),
+                    this.grad2(this.p[B  ], x-1, y  )
+                ),
+                this.lerp(u,
+                    this.grad2(this.p[A+1], x  , y-1),
+                    this.grad2(this.p[B+1], x-1, y-1)
+                )
+            );
+        }
+
+        fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+        lerp(t, a, b) { return a + t * (b - a); }
+        grad2(hash, x, y) {
+            const h = hash & 15;
+            const grad = this.grad3[h % 12];
+            return grad[0] * x + grad[1] * y;
+        }
+    }
+
+    // ----- Inlined Main.js (single-file copy) -----
+    // NOTE: This is a direct inline copy of your Main.js. For single-file sharing you can use this.
+
+// Game state
+let gameStarted = false;
+let isMultiplayer = false;
+let isHost = false;
+let ws = null;
+let peer = null;
+let connections = new Map();
+// Make these global so multiplayer handlers can access them before init runs
+let player = null;
+let scene = null;
+let camera = null;
+let renderer = null;
+let playerModel = null;
+let blocks = null;
+let blockGeometry = null;
+let isMobile = false; // set by mobile prompt
+// Relay/multiplayer ids
+let remotePlayers = {};
+let localPlayerId = null;
+let currentSessionId = null;
+
+// Mobile control state
+let _joyTouchId = null;
+let _lookTouchId = null;
+let _joyCenter = null;
+let _joyRadius = 56;
+let _mobileLookHandler = null;
+let _mobileJoyMoveHandler = null;
+let _mobileJoyEndHandler = null;
+let _mobileJumpStart = null;
+let _mobileJumpEnd = null;
+
+// Multiplayer state sync
+function setupMultiplayer() {
+    // Avoid opening multiple WebSocket connections
+    const serverList = document.getElementById('server-list');
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        // Already connected — show current list (server will push updates)
+        if (serverList && serverList.children.length === 0) {
+            const none = document.createElement('div');
+            none.className = 'server-item disabled';
+            none.textContent = 'No active servers';
+            serverList.appendChild(none);
+        }
+        return;
+    }
+
+    // Show searching message immediately so users get feedback
+    if (serverList) {
+        serverList.innerHTML = '';
+        const searching = document.createElement('div');
+        searching.className = 'server-item disabled';
+        searching.textContent = 'Searching for servers...';
+        serverList.appendChild(searching);
+    }
+
+    // Create WebSocket connection to signaling server
+    // Try multiple server URLs for school-friendly hosting
+    const serverUrls = [
+        // If hosted on same domain, use relative WebSocket
+        `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`,
+        // Fallback to localhost for local testing
+        'ws://localhost:3000',
+        // Add your deployed server URL here (e.g., from Glitch, Render, Railway)
+        // 'wss://your-game-server.glitch.me',
+    ];
+
+    let serverUrl = serverUrls[0];
+    // If we're on file:// protocol, use localhost
+    if (window.location.protocol === 'file:') {
+        serverUrl = 'ws://localhost:3000';
+    }
+
+    try {
+        ws = new WebSocket(serverUrl);
+    } catch (err) {
+        console.error('Failed to create WebSocket:', err);
+        if (serverList) {
+            serverList.innerHTML = '';
+            const fail = document.createElement('div');
+            fail.className = 'server-item disabled';
+            fail.textContent = 'Unable to contact server';
+            serverList.appendChild(fail);
+        }
+        return;
+    }
+
+    ws.onopen = () => {
+        console.log('Connected to signaling server');
+        // waiting for server to send sessionList
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        switch(data.type) {
+            case 'sessionList':
+                updateServerList(data.sessions);
+                break;
+            case 'hosted':
+                if (isHost) {
+                    setupPeerHost(data.sessionId);
+                    // store last hosted session id for relay
+                    ws._lastHostedSession = data.sessionId;
+                }
+                break;
+            case 'joinRequest':
+                if (isHost) {
+                    handleJoinRequest(data.peerId, data.name);
+                }
+                break;
+            case 'relay_position':
+                // position update relayed by server
+                handleRelayPosition(data.playerId, data.position);
+                break;
+            case 'relay_block':
+                handleRelayBlock(data.playerId, data.x, data.y, data.z, data.action);
+                break;
+            case 'relay_joined':
+                console.log('A player joined via relay:', data.playerId);
+                break;
+        }
+    };
+
+    ws.onerror = (e) => {
+        console.warn('WebSocket error', e);
+        if (serverList) {
+            serverList.innerHTML = '';
+            const err = document.createElement('div');
+            err.className = 'server-item disabled';
+            err.textContent = 'Error connecting to server';
+            serverList.appendChild(err);
+        }
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket closed');
+        if (serverList) {
+            // show no servers when connection closed
+            serverList.innerHTML = '';
+            const none = document.createElement('div');
+            none.className = 'server-item disabled';
+            none.textContent = 'No active servers';
+            serverList.appendChild(none);
+        }
+    };
+}
+
+function setupPeerHost(sessionId) {
+    peer = new Peer();
+    
+    peer.on('open', (id) => {
+        console.log('Hosting game with peer ID:', id);
+        // record local id for relay usage
+        localPlayerId = id;
+        // if we know the hosted session id from the websocket, use it
+        if (ws && ws._lastHostedSession) currentSessionId = ws._lastHostedSession;
+    });
+    
+    peer.on('connection', (conn) => {
+        handlePeerConnection(conn);
+    });
+}
+
+function setupPeerClient() {
+    peer = new Peer();
+    
+    peer.on('open', (id) => {
+        console.log('Client peer ID:', id);
+    });
+}
+
+function handlePeerConnection(conn) {
+    connections.set(conn.peer, conn);
+    
+    conn.on('data', (data) => {
+        handlePeerData(data, conn.peer);
+    });
+    
+    conn.on('close', () => {
+        connections.delete(conn.peer);
+    });
+}
+
+function handlePeerData(data, peerId) {
+    switch(data.type) {
+        case 'position':
+            updatePlayerPosition(peerId, data.position);
+            break;
+        case 'block':
+            updateBlock(data.x, data.y, data.z, data.action);
+            break;
+    }
+}
+
+// Update remote player (called for both peer and relay updates)
+function updatePlayerPosition(id, pos) {
+    updateRemotePlayerPosition(id, pos);
+}
+
+function updateRemotePlayerPosition(id, pos) {
+    if (!id || id === localPlayerId) return; // ignore our own
+    let entry = remotePlayers[id];
+    if (!entry) {
+        // create a simple box to represent the remote player
+        const geom = new THREE.BoxGeometry(0.5, 1.6, 0.5);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+        const mesh = new THREE.Mesh(geom, mat);
+        scene.add(mesh);
+        remotePlayers[id] = { mesh };
+        entry = remotePlayers[id];
+    }
+    entry.mesh.position.set(pos.x, pos.y - (player ? player.eyeHeight : 1.8), pos.z);
+    if (typeof pos.rotation === 'number') entry.mesh.rotation.y = pos.rotation;
+}
+
+function handleRelayPosition(playerId, position) {
+    updateRemotePlayerPosition(playerId, position);
+}
+
+function handleRelayBlock(playerId, x, y, z, action) {
+    // Mirror the same behavior as local block updates
+    if (action === 'place') {
+        if (!blocks[x]) blocks[x] = [];
+        if (!blocks[x][z]) blocks[x][z] = [];
+        if (!blocks[x][z][y]) {
+            const block = new THREE.Mesh(blockGeometry, materials.grass);
+            block.position.set(x, y, z);
+            scene.add(block);
+            blocks[x][z][y] = block;
+        }
+    } else if (action === 'remove') {
+        if (blocks[x]?.[z]?.[y]) {
+            scene.remove(blocks[x][z][y]);
+            blocks[x][z][y] = undefined;
+        }
+    }
+}
+
+function broadcastPosition() {
+    if (connections.size > 0) {
+        const data = {
+            type: 'position',
+            position: {
+                x: player.position.x,
+                y: player.position.y,
+                z: player.position.z,
+                rotation: player.bodyYaw
+            }
+        };
+        
+        for (let conn of connections.values()) {
+            conn.send(data);
+        }
+    }
+    // Also send position via server relay if available so clients behind restrictive networks can sync
+    if (ws && ws.readyState === WebSocket.OPEN && currentSessionId && localPlayerId) {
+        try {
+            ws.send(JSON.stringify({ type: 'relay_position', sessionId: currentSessionId, playerId: localPlayerId, position: { x: player.position.x, y: player.position.y, z: player.position.z, rotation: player.bodyYaw } }));
+        } catch (e) { console.warn('relay_position send failed', e); }
+    }
+}
+
+function updateServerList(sessions) {
+    const serverList = document.getElementById('server-list');
+    serverList.innerHTML = '';
+    
+    if (!sessions || sessions.length === 0) {
+        const none = document.createElement('div');
+        none.className = 'server-item disabled';
+        none.textContent = 'No active servers';
+        serverList.appendChild(none);
+        return;
+    }
+
+    sessions.forEach(session => {
+        const item = document.createElement('div');
+        item.className = 'server-item';
+        item.textContent = `${session.name} (${session.players} players)`;
+        item.onclick = () => joinGame(session.id);
+        serverList.appendChild(item);
+    });
+}
+
+// Join a game as a client
+function joinGame(sessionId) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.warn('WebSocket not connected yet');
+        return;
+    }
+
+    isMultiplayer = true;
+
+    // Create a Peer for this client
+    peer = new Peer();
+
+    peer.on('open', (id) => {
+        console.log('Client peer id:', id);
+
+        // Ask the server to join the session and include our peer id
+        const playerName = (document.getElementById('game-name')?.value || 'Player');
+        ws.send(JSON.stringify({
+            type: 'join',
+            sessionId,
+            peerId: id,
+            name: playerName
+        }));
+        // record our local id and also join the session via WebSocket relay so we can fall back
+        localPlayerId = id;
+        currentSessionId = sessionId;
+        try {
+            ws.send(JSON.stringify({ type: 'join_relay', sessionId, playerId: id }));
+        } catch(e) { console.warn('Failed to send join_relay', e); }
+        
+        // Hide menus and start game if not started
+        const mainMenu = document.getElementById('main-menu');
+        const multiplayerMenu = document.getElementById('multiplayer-menu');
+        if (mainMenu) mainMenu.style.display = 'none';
+        if (multiplayerMenu) multiplayerMenu.style.display = 'none';
+        const overlay = document.getElementById('overlay');
+        if (overlay) overlay.style.display = 'block';
+        if (!gameStarted) {
+            init();
+            gameStarted = true;
+        }
+    });
+
+    peer.on('connection', (conn) => {
+        // Host will connect to us; handle the incoming connection
+        handlePeerConnection(conn);
+    });
+}
+
+// Host: when the signaling server notifies us someone wants to join
+function handleJoinRequest(peerId, name) {
+    if (!peer) return;
+    console.log('Incoming join request from', peerId, name);
+
+    const conn = peer.connect(peerId);
+    conn.on('open', () => {
+        // Register connection and send initial world state
+        handlePeerConnection(conn);
+
+        // Send a minimal initial sync (e.g., host player position)
+        conn.send({
+            type: 'position',
+            position: {
+                x: player.position.x,
+                y: player.position.y,
+                z: player.position.z,
+                rotation: player.bodyYaw
+            }
+        });
+    });
+    conn.on('error', (err) => console.warn('Peer connect error', err));
+}
+
+// Menu handlers
+function setupMenuHandlers() {
+    const mainMenu = document.getElementById('main-menu');
+    const multiplayerMenu = document.getElementById('multiplayer-menu');
+    const hostMenu = document.getElementById('host-menu');
+    const overlay = document.getElementById('overlay');
+    const loadingScreen = document.getElementById('loading-screen');
+    
+    // Singleplayer button
+    document.getElementById('singleplayer').addEventListener('click', () => {
+        mainMenu.style.display = 'none';
+        loadingScreen.style.display = 'flex';
+        
+        // Show loading progress
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingText = document.getElementById('loading-text');
+        const messages = [
+            'Loading terrain...',
+            'Building terrain...',
+            'Growing trees...',
+            'Generating chunks...',
+            'Almost there...'
+        ];
+        let progress = 0;
+        const loadingInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 100) progress = 100;
+            loadingBar.style.width = progress + '%';
+            loadingText.textContent = messages[Math.floor((progress/100) * (messages.length-1))];
+            
+            if (progress === 100) {
+                clearInterval(loadingInterval);
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    overlay.style.display = 'block';
+                    if (!gameStarted) {
+                        init();
+                        gameStarted = true;
+                    }
+                }, 500);
+            }
+        }, 200);
+    });
+    
+    // Multiplayer button
+    document.getElementById('multiplayer').addEventListener('click', () => {
+        mainMenu.style.display = 'none';
+        multiplayerMenu.style.display = 'flex';
+        setupMultiplayer();
+    });
+
+    // Host Game button
+    document.getElementById('host-game').addEventListener('click', () => {
+        multiplayerMenu.style.display = 'none';
+        hostMenu.style.display = 'flex';
+    });
+
+    // Start Server button
+    document.getElementById('start-server').addEventListener('click', () => {
+        const gameName = document.getElementById('game-name').value.trim();
+        if (gameName) {
+            isHost = true;
+            isMultiplayer = true;
+            hostMenu.style.display = 'none';
+            
+            // Show loading screen
+            loadingScreen.style.display = 'flex';
+            const loadingBar = document.getElementById('loading-bar');
+            const loadingText = document.getElementById('loading-text');
+            let progress = 0;
+            
+            const loadingInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 100) progress = 100;
+                loadingBar.style.width = progress + '%';
+                loadingText.textContent = 'Starting server...';
+                
+                if (progress === 100) {
+                    clearInterval(loadingInterval);
+                    setupMultiplayer();
+                    
+                    // Send host message to server
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'host', name: gameName }));
+                    } else if (ws) {
+                        ws.addEventListener('open', () => {
+                            ws.send(JSON.stringify({ type: 'host', name: gameName }));
+                        });
+                    }
+                    
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                        overlay.style.display = 'block';
+                        if (!gameStarted) {
+                            init();
+                            gameStarted = true;
+                        }
+                    }, 500);
+                }
+            }, 200);
+        }
+    });
+
+    // Back buttons
+    document.getElementById('back-to-main').addEventListener('click', () => {
+        multiplayerMenu.style.display = 'none';
+        mainMenu.style.display = 'flex';
+    });
+
+    document.getElementById('back-to-multiplayer').addEventListener('click', () => {
+        hostMenu.style.display = 'none';
+        multiplayerMenu.style.display = 'flex';
+    });
+
+    // Quit button
+    document.getElementById('quit').addEventListener('click', () => {
+        window.close();
+    });
+}
+    const mainMenu = document.getElementById('main-menu');
+    const multiplayerMenu = document.getElementById('multiplayer-menu');
+    const hostMenu = document.getElementById('host-menu');
+    const overlay = document.getElementById('overlay');
+    
+    // Singleplayer button
+    document.getElementById('singleplayer').addEventListener('click', () => {});
+        mainMenu.style.display = 'none';
+        const loadingScreen = document.getElementById('loading-screen');
+        loadingScreen.style.display = 'flex';
+        
+        // Show loading progress
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingText = document.getElementById('loading-text');
+        const messages = [
+            'Loading terrain...',
+            'Building terrain...',
+            'Growing trees...',
+            'Generating chunks...',
+            'Almost there...'
+        ];
+        let progress = 0;
+        const loadingInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 100) progress = 100;
+            loadingBar.style.width = progress + '%';
+            loadingText.textContent = messages[Math.floor((progress/100) * (messages.length-1))];
+            
+            if (progress === 100) {
+                clearInterval(loadingInterval);
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    overlay.style.display = 'block';
+                    if (!gameStarted) {
+                        init();
+                        gameStarted = true;
+                    }
+                }, 500);
+            }
+        }, 200);
+    
+    // Multiplayer button
+    document.getElementById('multiplayer').addEventListener('click', () => {
+        mainMenu.style.display = 'none';
+        multiplayerMenu.style.display = 'flex';
+        setupMultiplayer();
+    });
+
+    // Join Game button in multiplayer menu
+    const joinGameBtn = document.getElementById('join-game');
+    if (joinGameBtn) {
+        joinGameBtn.addEventListener('click', () => {
+            // Ensure the multiplayer menu is visible and start the signaling connection
+            mainMenu.style.display = 'none';
+            multiplayerMenu.style.display = 'flex';
+            setupMultiplayer();
+            // Focus server list area visually
+            const serverList = document.getElementById('server-list');
+            if (serverList) serverList.scrollTop = 0;
+        });
+    }
+
+    // (No main-menu Join Game button — join is done from the multiplayer menu)
+    
+    // Host Game button
+    document.getElementById('host-game').addEventListener('click', () => {
+        multiplayerMenu.style.display = 'none';
+        hostMenu.style.display = 'flex';
+    });
+
+    // Start Server button
+    document.getElementById('start-server').addEventListener('click', () => {});
+        const gameName = document.getElementById('game-name').value.trim();
+        if (gameName) {
+            isHost = true;
+            isMultiplayer = true;
+            hostMenu.style.display = 'none';
+
+            // Show loading screen first
+            const loadingScreen = document.getElementById('loading-screen');
+            loadingScreen.style.display = 'flex';
+            const loadingBar = document.getElementById('loading-bar');
+            const loadingText = document.getElementById('loading-text');
+            let progress = 0;
+
+            const loadingInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 100) progress = 100;
+                loadingBar.style.width = progress + '%';
+                loadingText.textContent = 'Starting server...';
+
+                if (progress === 100) {
+                    clearInterval(loadingInterval);
+                    // Ensure we have a WebSocket connection to the signaling server before sending 'host'
+                    setupMultiplayer();
+                    
+                    const doHost = () => {
+                        try {
+                            ws.send(JSON.stringify({ type: 'host', name: gameName }));
+                        } catch (err) {
+                            // If send fails because ws isn't ready yet, wait for open event
+                            if (ws) {
+                                const onOpen = () => {
+                                    ws.removeEventListener('open', onOpen);
+                                    try { ws.send(JSON.stringify({ type: 'host', name: gameName })); } catch(e) { console.warn('Failed to send host after open', e); }
+                                };
+                                ws.addEventListener('open', onOpen);
+                            }
+                        }
+
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    overlay.style.display = 'block';
+                    if (!gameStarted) {
+                        init();
+                        gameStarted = true;
+                    }
+                }, 500);
+            };
+
+            // If ws already exists and is open, send immediately, otherwise wait for open
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                doHost();
+            } else if (ws) {
+                const onOpenOnce = () => {
+                    ws.removeEventListener('open', onOpenOnce);
+                    doHost();
+                };
+                ws.addEventListener('open', onOpenOnce);
+            } else {
+                // Fallback: small timeout to allow setupMultiplayer to set ws
+                setTimeout(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) doHost();
+                    else if (ws) {
+                        ws.addEventListener('open', () => doHost());
+                    } else {
+                        console.warn('Unable to create signaling WebSocket to host game');
+                    }
+                }, 200);
+            }
+        }
+    });
+
+    // Back buttons
+    document.getElementById('back-to-main').addEventListener('click', () => {
+        multiplayerMenu.style.display = 'none';
+        mainMenu.style.display = 'flex';
+    });
+
+    document.getElementById('back-to-multiplayer').addEventListener('click', () => {
+        hostMenu.style.display = 'none';
+        multiplayerMenu.style.display = 'flex';
+    });
+
+    // Quit button
+    document.getElementById('quit').addEventListener('click', () => {
+        window.close();
+    });
+}
+
+// Mobile prompt and controls
+function showMobilePrompt() {
+    const prompt = document.getElementById('mobile-prompt');
+    if (!prompt) return;
+    prompt.style.display = 'flex';
+
+    const yes = document.getElementById('mobile-yes');
+    const no = document.getElementById('mobile-no');
+
+    const cleanup = () => {
+        if (yes) yes.onclick = null;
+        if (no) no.onclick = null;
+        prompt.style.display = 'none';
+    };
+
+    if (yes) yes.onclick = () => {
+        isMobile = true;
+        cleanup();
+        enableMobileControls();
+    };
+
+    if (no) no.onclick = () => {
+        isMobile = false;
+        cleanup();
+    };
+}
+
+function enableMobileControls() {
+    const controls = document.getElementById('mobile-controls');
+    const joystick = document.getElementById('joystick');
+    const jump = document.getElementById('jump-button');
+    if (controls) controls.style.display = 'block';
+
+    // Joystick handlers
+    _mobileJoyMoveHandler = (e) => {
+        for (const t of Array.from(e.touches)) {
+            if (_joyTouchId === null) continue;
+            if (t.identifier !== _joyTouchId) continue;
+            const rect = joystick.getBoundingClientRect();
+            const cx = rect.left + rect.width/2;
+            const cy = rect.top + rect.height/2;
+            const dx = t.clientX - cx;
+            const dy = t.clientY - cy;
+            const nx = Math.max(-1, Math.min(1, dx / _joyRadius));
+            const ny = Math.max(-1, Math.min(1, dy / _joyRadius));
+            // Map to WASD
+            keys['KeyW'] = (-ny) > 0.35;
+            keys['KeyS'] = (-ny) < -0.35;
+            keys['KeyD'] = (nx) > 0.35;
+            keys['KeyA'] = (nx) < -0.35;
+        }
+        e.preventDefault();
+    };
+
+    _mobileJoyEndHandler = (e) => {
+        // clear joystick when touch ends
+        if (!e.touches || e.touches.length === 0) {
+            _joyTouchId = null;
+            keys['KeyW'] = keys['KeyS'] = keys['KeyA'] = keys['KeyD'] = false;
+        }
+    };
+
+    joystick.addEventListener('touchstart', (ev) => {
+        const t = ev.touches[0];
+        _joyTouchId = t.identifier;
+        ev.preventDefault();
+    });
+    joystick.addEventListener('touchmove', _mobileJoyMoveHandler, { passive: false });
+    joystick.addEventListener('touchend', _mobileJoyEndHandler);
+
+    // Look handler on right side using stored last positions
+    const _touchLast = new Map();
+
+    const _mobileTouchStart = (ev) => {
+        for (const t of Array.from(ev.touches)) {
+            const w = window.innerWidth;
+            if (t.clientX > w/2) {
+                _touchLast.set(t.identifier, { x: t.clientX, y: t.clientY });
+            }
+        }
+    };
+
+    _mobileLookHandler = (ev) => {
+        for (const t of Array.from(ev.touches)) {
+            const w = window.innerWidth;
+            if (t.clientX > w/2) {
+                const last = _touchLast.get(t.identifier);
+                if (last) {
+                    const dx = t.clientX - last.x;
+                    const dy = t.clientY - last.y;
+                    yaw -= dx * 0.01;
+                    pitch -= dy * 0.01;
+                    pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, pitch));
+                    _touchLast.set(t.identifier, { x: t.clientX, y: t.clientY });
+                } else {
+                    _touchLast.set(t.identifier, { x: t.clientX, y: t.clientY });
+                }
+            }
+        }
+        ev.preventDefault();
+    };
+
+    document.addEventListener('touchstart', _mobileTouchStart, { passive: false });
+    document.addEventListener('touchmove', _mobileLookHandler, { passive: false });
+    document.addEventListener('touchend', (ev) => {
+        for (const t of Array.from(ev.changedTouches)) {
+            _touchLast.delete(t.identifier);
+        }
+    });
+
+    // Jump button
+    _mobileJumpStart = (e) => { keys['Space'] = true; e.preventDefault(); };
+    _mobileJumpEnd = (e) => { keys['Space'] = false; e.preventDefault(); };
+    if (jump) {
+        jump.addEventListener('touchstart', _mobileJumpStart);
+        jump.addEventListener('touchend', _mobileJumpEnd);
+    }
+}
+
+function disableMobileControls() {
+    const joystick = document.getElementById('joystick');
+    const jump = document.getElementById('jump-button');
+    const controls = document.getElementById('mobile-controls');
+    if (controls) controls.style.display = 'none';
+    if (joystick) {
+        joystick.removeEventListener('touchmove', _mobileJoyMoveHandler);
+        joystick.removeEventListener('touchend', _mobileJoyEndHandler);
+    }
+    document.removeEventListener('touchmove', _mobileLookHandler);
+    if (jump) {
+        jump.removeEventListener('touchstart', _mobileJumpStart);
+        jump.removeEventListener('touchend', _mobileJumpEnd);
+    }
+    // clear keys
+    keys['KeyW'] = keys['KeyA'] = keys['KeyS'] = keys['KeyD'] = keys['Space'] = false;
+}
+
+// Wait for Three.js to be loaded
+window.addEventListener('load', () => {
+    if (typeof THREE === 'undefined') {
+        console.error('Three.js not loaded!');
+        return;
+    }
+    setupMenuHandlers();
+});
+
+function init() {}
+    // Ask whether the user is on mobile when the game starts
+    showMobilePrompt();
+// Game variables
+const WORLD_SIZE = 32;
+const CHUNK_SIZE = 16;
+const MAX_HEIGHT = 5;
+
+// Camera modes
+const CAMERA_MODES = {
+    FIRST_PERSON: 'first_person',
+    THIRD_PERSON: 'third_person'
+};
+
+// Movement states for body rotation
+const MOVEMENT_STATES = {
+    IDLE: 'idle',
+    MOVING: 'moving'
+};
+
+// Player settings
+player = {
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    onGround: false,
+    speed: 5,
+    jumpForce: 8,
+    cameraMode: CAMERA_MODES.FIRST_PERSON,
+    thirdPersonDistance: 4, // Default Minecraft-like distance
+    eyeHeight: 1.8,
+    bodyYaw: 0,
+    targetBodyYaw: 0,
+    movementState: MOVEMENT_STATES.IDLE,
+    bodyRotationSpeed: 10, // Adjust this to control how fast the body rotates to match movement
+    thirdPersonHeight: 0.5 // Height offset for third person camera
+};
+
+// Set initial player position
+player.position.set(WORLD_SIZE/2, MAX_HEIGHT + 2, WORLD_SIZE/2);// Initialize scene
+scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);  // Sky blue
+
+// Setup camera
+camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(WORLD_SIZE/2, MAX_HEIGHT + 2, WORLD_SIZE/2);
+
+// Setup renderer
+renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Add lights
+const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+scene.add(light);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+dirLight.position.set(5, 10, 7);
+scene.add(dirLight);
+
+// Create custom player model
+function createPlayerModel() {
+    const group = new THREE.Group();
+    const playerMaterials = {
+        skin: new THREE.MeshStandardMaterial({ color: 0xd6a57a }), // Skin color
+        shirt: new THREE.MeshStandardMaterial({ color: 0x3155c4 }), // Blue shirt
+        pants: new THREE.MeshStandardMaterial({ color: 0x354b6b }), // Dark blue pants
+        shoes: new THREE.MeshStandardMaterial({ color: 0x3d3d3d }) // Dark gray shoes
+    };
+
+    // Head (slightly larger than standard minecraft for better visibility)
+    const head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.5, 0.5),
+        playerMaterials.skin
+    );
+    head.position.y = 1.5;
+    group.add(head);
+
+    // Body
+    const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.75, 0.25),
+        playerMaterials.shirt
+    );
+    body.position.y = 0.875;
+    group.add(body);
+
+    // Arms
+    const armGeometry = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+    const leftArm = new THREE.Mesh(armGeometry, playerMaterials.shirt);
+    leftArm.position.set(0.375, 0.875, 0);
+    group.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeometry, playerMaterials.shirt);
+    rightArm.position.set(-0.375, 0.875, 0);
+    group.add(rightArm);
+
+    // Legs
+    const legGeometry = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+    
+    const leftLeg = new THREE.Mesh(legGeometry, playerMaterials.pants);
+    leftLeg.position.set(0.125, 0.375, 0);
+    group.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeometry, playerMaterials.pants);
+    rightLeg.position.set(-0.125, 0.375, 0);
+    group.add(rightLeg);
+
+    // Shoes
+    const shoeGeometry = new THREE.BoxGeometry(0.25, 0.125, 0.25);
+    
+    const leftShoe = new THREE.Mesh(shoeGeometry, playerMaterials.shoes);
+    leftShoe.position.set(0.125, 0.0625, 0);
+    group.add(leftShoe);
+
+    const rightShoe = new THREE.Mesh(shoeGeometry, playerMaterials.shoes);
+    rightShoe.position.set(-0.125, 0.0625, 0);
+    group.add(rightShoe);
+
+    // Add some simple animations
+    const animate = (time) => {
+        if (player.velocity.lengthSq() > 0.1) {
+            // Walking animation
+            const speed = 10;
+            leftLeg.rotation.x = Math.sin(time * speed) * 0.5;
+            rightLeg.rotation.x = -Math.sin(time * speed) * 0.5;
+            leftArm.rotation.x = -Math.sin(time * speed) * 0.5;
+            rightArm.rotation.x = Math.sin(time * speed) * 0.5;
+        } else {
+            // Reset to standing position
+            leftLeg.rotation.x = 0;
+            rightLeg.rotation.x = 0;
+            leftArm.rotation.x = 0;
+            rightArm.rotation.x = 0;
+        }
+    };
+
+    group.animate = animate;
+    return group;
+}
+
+// Create and add the player model
+playerModel = createPlayerModel();
+scene.add(playerModel);
+
+// Load textures
+const textureLoader = new THREE.TextureLoader();
+const grassTop = textureLoader.load('Textures/Grass_Top.jpg');
+const grassSide = textureLoader.load('Textures/Grass_Side.png');
+const dirt = textureLoader.load('Textures/Dirt.png');
+
+// Make textures pixel-perfect (no blur)
+grassTop.magFilter = THREE.NearestFilter;
+grassSide.magFilter = THREE.NearestFilter;
+dirt.magFilter = THREE.NearestFilter;
+
+// Load additional textures
+const stone = textureLoader.load('Textures/Stone.png');
+const bedrock = textureLoader.load('Textures/Bedrock.png');
+
+// Make textures pixel-perfect
+stone.magFilter = THREE.NearestFilter;
+bedrock.magFilter = THREE.NearestFilter;
+
+// Create terrain materials
+blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+
+// Create materials for each face of blocks
+const materials = {
+    grass: [
+        new THREE.MeshStandardMaterial({ map: grassSide }), // right
+        new THREE.MeshStandardMaterial({ map: grassSide }), // left
+        new THREE.MeshStandardMaterial({ map: grassTop }), // top
+        new THREE.MeshStandardMaterial({ map: dirt }), // bottom
+        new THREE.MeshStandardMaterial({ map: grassSide }), // front
+        new THREE.MeshStandardMaterial({ map: grassSide }) // back
+    ],
+    dirt: new THREE.MeshStandardMaterial({ map: dirt }),
+    stone: new THREE.MeshStandardMaterial({ map: stone }),
+    bedrock: new THREE.MeshStandardMaterial({ map: bedrock })
+};
+
+// Generate noise
+const NOISE_SCALE = 20; // Adjust this to change terrain "spread"
+const TERRAIN_HEIGHT = 12; // Maximum terrain height
+const noise = new Noise(Math.random());
+
+// Create terrain
+blocks = [];
+
+for(let x = 0; x < WORLD_SIZE; x++) {
+    blocks[x] = [];
+    for(let z = 0; z < WORLD_SIZE; z++) {
+        blocks[x][z] = [];
+        
+        // Generate height using multiple octaves of noise
+        const nx = x / NOISE_SCALE;
+        const nz = z / NOISE_SCALE;
+        
+        let height = 0;
+        height += noise.perlin2(nx, nz) * 1.0;
+        height += noise.perlin2(nx * 2, nz * 2) * 0.5;
+        height += noise.perlin2(nx * 4, nz * 4) * 0.25;
+        
+        // Normalize and scale height
+        height = (height + 1.5) * TERRAIN_HEIGHT / 3;
+        height = Math.floor(Math.max(1, Math.min(TERRAIN_HEIGHT, height)));
+        
+        // Create blocks
+        for(let y = 0; y < height; y++) {
+            let material;
+            if (y === height - 1) {
+                material = materials.grass; // Top layer is grass with different faces
+            } else if (y > height - 4) {
+                material = new THREE.MeshStandardMaterial({ map: dirt }); // Next 3 layers are dirt
+            } else {
+                material = materials.stone; // Everything below is stone
+            }
+            
+            const block = new THREE.Mesh(blockGeometry, material);
+            block.position.set(x, y, z);
+            scene.add(block);
+            blocks[x][z][y] = block;
+        }
+    }
+}
+
+// Controls and Raycasting
+const keys = {};
+let yaw = 0;
+let pitch = 0;
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(0, 0);
+let selectedBlock = null;
+let selectedFace = null;
+
+// Handle mouse controls
+document.body.addEventListener('click', (e) => {
+    if (document.pointerLockElement === document.body) {
+        // Left click to break blocks
+        if (e.button === 0 && !e.ctrlKey && selectedBlock) {
+            const x = Math.floor(selectedBlock.position.x);
+            const y = Math.floor(selectedBlock.position.y);
+            const z = Math.floor(selectedBlock.position.z);
+            if (blocks[x] && blocks[x][z] && blocks[x][z][y]) {
+                scene.remove(blocks[x][z][y]);
+                blocks[x][z][y] = undefined;
+            }
+        }
+        // Right click or Ctrl+Left click to place blocks
+        if (e.button === 2 || (e.button === 0 && e.ctrlKey)) {
+            if (selectedBlock && selectedFace) {
+                const pos = selectedBlock.position.clone();
+                pos.add(selectedFace);
+                const x = Math.floor(pos.x);
+                const y = Math.floor(pos.y);
+                const z = Math.floor(pos.z);
+                
+                // Don't place if there's already a block there
+                if (!blocks[x]?.[z]?.[y]) {
+                    // Create new block
+                    if (!blocks[x]) blocks[x] = [];
+                    if (!blocks[x][z]) blocks[x][z] = [];
+                    const block = new THREE.Mesh(blockGeometry, materials.grass);
+                    block.position.set(x, y, z);
+                    scene.add(block);
+                    blocks[x][z][y] = block;
+                }
+            }
+        }
+    } else {
+        // Only request pointer lock on non-mobile devices
+        if (!isMobile) document.body.requestPointerLock();
+    }
+});
+
+// Prevent right-click menu
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === document.body) {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, pitch));
+        
+        // Only set camera rotation directly in first person mode
+        if (player.cameraMode === CAMERA_MODES.FIRST_PERSON) {
+            camera.rotation.set(pitch, yaw, 0);
+        }
+        
+        // Update raycaster
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(scene.children);
+        
+        // Find first block intersection
+        selectedBlock = null;
+        selectedFace = null;
+        for (const intersect of intersects) {
+            if (intersect.object.geometry === blockGeometry) {
+                selectedBlock = intersect.object;
+                selectedFace = intersect.face.normal;
+                break;
+            }
+        }
+    }
+});
+
+// Key controls
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    
+    // Handle F5 for camera mode toggle
+    if (e.code === 'F5') {
+        e.preventDefault(); // Prevent browser refresh
+        player.cameraMode = player.cameraMode === CAMERA_MODES.FIRST_PERSON 
+            ? CAMERA_MODES.THIRD_PERSON 
+            : CAMERA_MODES.FIRST_PERSON;
+    }
+    
+    // Handle Escape key for pause menu
+    if (e.code === 'Escape' && gameStarted) {
+        e.preventDefault();
+        const mainMenu = document.getElementById('main-menu');
+        const overlay = document.getElementById('overlay');
+        
+        if (mainMenu.style.display === 'none') {
+            mainMenu.style.display = 'flex';
+            overlay.style.display = 'none';
+            document.exitPointerLock();
+        } else {
+            mainMenu.style.display = 'none';
+            overlay.style.display = 'block';
+            document.body.requestPointerLock();
+        }
+    }
+});
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// Collision detection
+function isBlockAt(x, y, z) {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    z = Math.floor(z);
+    return blocks[x]?.[z]?.[y] !== undefined;
+}
+
+// Game loop
+let lastTime = performance.now();
+
+function animate() {
+    const time = performance.now();
+    const delta = Math.min(0.1, (time - lastTime) / 1000);
+    lastTime = time;
+
+    // Movement
+    if (document.pointerLockElement === document.body) {
+        const forward = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
+        const right = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
+        
+        if (forward || right) {
+            const speed = player.speed * delta * (keys['ShiftLeft'] ? 2 : 1); // Sprint with Shift
+            
+            // Calculate movement direction relative to camera
+            const moveAngle = Math.atan2(right, forward);
+            const totalAngle = yaw + moveAngle;
+            
+            const moveX = Math.sin(totalAngle);
+            const moveZ = -Math.cos(totalAngle);
+            
+            // Update target body rotation to face movement direction
+            player.targetBodyYaw = totalAngle;
+            player.movementState = MOVEMENT_STATES.MOVING;
+            
+            // Try to move X and Z separately to allow sliding along walls
+            const newX = player.position.x + moveX * speed;
+            const newZ = player.position.z + moveZ * speed;
+            
+            // Check head and feet level for collisions
+            const canMoveX = !isBlockAt(newX, player.position.y - 0.5, player.position.z) && 
+                           !isBlockAt(newX, player.position.y - 1.6, player.position.z);
+            const canMoveZ = !isBlockAt(player.position.x, player.position.y - 0.5, newZ) && 
+                           !isBlockAt(player.position.x, player.position.y - 1.6, newZ);
+            
+            if (canMoveX) player.position.x = newX;
+            if (canMoveZ) player.position.z = newZ;
+        }
+
+        // Gravity and jumping
+        if (isBlockAt(player.position.x, player.position.y - 1.7, player.position.z)) {
+            player.onGround = true;
+            player.velocity.y = 0;
+            if (keys['Space']) {
+                player.velocity.y = player.jumpForce;
+            }
+        } else {
+            player.onGround = false;
+            player.velocity.y -= 20 * delta;
+        }
+
+        const newY = player.position.y + player.velocity.y * delta;
+        if (!isBlockAt(player.position.x, newY - 1.6, player.position.z)) {
+            player.position.y = newY;
+        } else if (player.velocity.y < 0) {
+            player.position.y = Math.floor(newY - 1.6) + 1.6;
+            player.velocity.y = 0;
+            player.onGround = true;
+        }
+
+        // Update camera position based on mode
+        if (player.cameraMode === CAMERA_MODES.FIRST_PERSON) {
+            camera.position.copy(player.position);
+            camera.rotation.set(pitch, yaw, 0);
+        } else {
+            // Third person camera position - Minecraft style
+            // Calculate the horizontal offset first
+            const horizontalDist = Math.cos(pitch) * player.thirdPersonDistance;
+            const verticalDist = Math.sin(pitch) * player.thirdPersonDistance;
+            
+            const cameraOffset = new THREE.Vector3(
+                -Math.sin(yaw) * horizontalDist,
+                player.thirdPersonHeight + verticalDist,
+                Math.cos(yaw) * horizontalDist
+            );
+            
+            // Add slight height offset for the camera target
+            const targetPosition = new THREE.Vector3();
+            targetPosition.copy(player.position);
+            targetPosition.y += player.eyeHeight;
+            
+            // Start ray from player position
+            const rayStart = player.position.clone();
+            rayStart.y += player.eyeHeight;
+            
+            // Check for wall collisions
+            raycaster.set(rayStart, cameraOffset.clone().normalize());
+            const intersects = raycaster.intersectObjects(scene.children);
+            const wallHit = intersects.find(hit => hit.object.geometry === blockGeometry);
+            
+            if (wallHit && wallHit.distance < player.thirdPersonDistance) {
+                // Move camera closer to avoid clipping through walls
+                const newDist = wallHit.distance - 0.5;
+                cameraOffset.normalize().multiplyScalar(newDist);
+            }
+
+            // Position camera
+            camera.position.copy(player.position);
+            camera.position.y += player.eyeHeight;
+            camera.position.add(cameraOffset);
+            
+            // Make camera look at player
+            camera.lookAt(targetPosition);
+        }
+    }
+
+    // Update player model
+    if (playerModel) {
+        // Update player model position
+        playerModel.position.copy(player.position);
+        playerModel.position.y -= player.eyeHeight;
+        
+        // Smoothly interpolate body rotation
+        if (player.movementState === MOVEMENT_STATES.MOVING) {
+            const rotationDiff = player.targetBodyYaw - player.bodyYaw;
+            // Normalize the difference to be between -PI and PI
+            const normalizedDiff = Math.atan2(Math.sin(rotationDiff), Math.cos(rotationDiff));
+            player.bodyYaw += normalizedDiff * player.bodyRotationSpeed * delta;
+        }
+        
+        playerModel.rotation.y = player.bodyYaw;
+        
+        // Reset movement state
+        player.movementState = MOVEMENT_STATES.IDLE;
+        
+        // Show/hide head based on camera mode
+        playerModel.children[0].visible = (player.cameraMode === CAMERA_MODES.THIRD_PERSON);
+        
+        // Animate the model
+        playerModel.animate(time * 0.001);
+    }
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Notify server when we unload so it can clean up relay registrations
+window.addEventListener('beforeunload', () => {
+    if (ws && ws.readyState === WebSocket.OPEN && currentSessionId && localPlayerId) {
+        try { ws.send(JSON.stringify({ type: 'leave_relay', sessionId: currentSessionId, playerId: localPlayerId })); } catch(e) {}
+    }
+});
+
+    // Set initial camera position and start the game
+    camera.position.set(WORLD_SIZE/2, MAX_HEIGHT + 2, WORLD_SIZE/2);
+    animate();
+
+    </script>
+</body>
+</html>
